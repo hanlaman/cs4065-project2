@@ -44,7 +44,7 @@ class Server:
         return listener
 
 def onMsgReceived(msg: str):
-    print("Received: " + msg)
+    print("! " + msg)
 
 server = Server()
 host = input("Host: ")
@@ -56,7 +56,7 @@ print("Connected!")
 listener = server.listen(onMsgReceived)
 print("Listening for server messages...")
 while (True):
-    cmd = input("Command: ")
+    cmd = input()
     if cmd == "close":
         server.disconnect()
         break
