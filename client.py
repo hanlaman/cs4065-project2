@@ -58,12 +58,12 @@ class ProtocolQueries:
         return f"LEAVE|{group}"
     def post(group: str, subject: str, content: str) -> str:
         return f"POST|{group}|{subject}|{content}"
-    def view(id: UUID) -> str:
-        return f"VIEW|{id}"
+    def view(group: str, id: int) -> str:
+        return f"VIEW|{group}|{id}"
     
 class ProtocolResponses:
     def parseGroups(msg: str):
-        # GROUPS|g1|g2|g3
+        # GROUPS|g1|g2|g3|...
         return msg.split("|")[1:]
     def parseUsers(msg: str) -> tuple[str, list[str]]:
         # USERS|group|usr1|usr2|...
@@ -77,14 +77,14 @@ class ProtocolResponses:
         # LEAVE|group|name
         parts = msg.split("|")
         return [parts[1], parts[2]]
-    def parseMessage(msg: str) -> tuple[str, str]:
+    def parseMessage(msg: str) -> tuple[str, int]:
         # MESSAGE|group|id
         parts = msg.split("|")
-        return [parts[1], parts[2]]
-    def parseView(msg: str) -> tuple[UUID, str, datetime, str, str]:
+        return [parts[1], int(parts[2])]
+    def parseView(msg: str) -> tuple[int, str, datetime, str, str]:
         # VIEW|id|sender|postDate|subject|contents
         parts = msg.split("|")
-        return [UUID(parts[1]), parts[2], datetime.fromisoformat(parts[3]), parts[4], parts[5]]
+        return [int(parts[1]), parts[2], datetime.fromisoformat(parts[3]), parts[4], parts[5]]
     
 class ConnectionFrame(Frame):
     def __init__(self, parent, server: Server, onConnected: Callable[[], None]) -> None:
@@ -119,7 +119,7 @@ class MainFrame(Frame):
         Frame.__init__(self, parent)
         self._server = server
         self._server.send(ProtocolQueries.join('Public', userName)) # JOIN public
-        self._joinFrame = JoinFrame(self, server, ['Group1', 'Group2', 'Group3', 'Group4', 'Group5']) # PRESET, need to query
+        self._joinFrame = JoinFrame(self, server, ['Group1', 'Group2', 'Group3', 'Group4', 'Group5']) # preset, need to query with GROUPS
         self._joinFrame.grid(row=0, column=0)
         self._sep = ttk.Separator(self, orient='horizontal')
         self._sep.grid(row=1, column=0)
@@ -146,7 +146,7 @@ class ChatsFrame(Frame):
         self._nb = ttk.Notebook(self)
         self._nb.grid(row=0, column=0)
         self._publicChat = ChatFrame(self)
-        self._nb.add(self._publicChat, text='public')
+        self._nb.add(self._publicChat, text='Public')
 
 class ChatFrame(Frame):
     def __init__(self, parent):
@@ -163,12 +163,16 @@ class UsersFrame(LabelFrame):
         LabelFrame.__init__(self, parent, text="Users")
         self._users = Listbox(self)
         self._users.grid(row=0, column=0)
+        self._scroll = Scrollbar(self)
+        self._scroll.grid(row=0, column=1)
 
 class MessagesFrame(LabelFrame):
     def __init__(self, parent):
         LabelFrame.__init__(self, parent, text="Messages")
         self._messages = Listbox(self)
         self._messages.grid(row=0, column=0)
+        self._scroll = Scrollbar(self)
+        self._scroll.grid(row=0, column=1)
 
 
 class DetailFrame(Frame):
