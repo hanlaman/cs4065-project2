@@ -3,6 +3,7 @@ import java.net.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadFactory;
 
 public class Server {
     public static final Map<String, Board> Groups = Map.ofEntries(
@@ -33,6 +34,7 @@ public class Server {
 }
 
 class Client implements Runnable {
+    private final ThreadFactory commandThreadFactory;
     private final Object lock = new Object();
     public Socket socket;
     private BufferedReader reader;
@@ -41,6 +43,7 @@ class Client implements Runnable {
     
     public Client(Socket socket) {
         this.socket = socket;
+        commandThreadFactory = Thread.ofVirtual().factory();
         try {
             this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.writer = new PrintWriter(socket.getOutputStream(), true);
@@ -73,7 +76,9 @@ class Client implements Runnable {
     }
 
     private Thread fireOffCmdHandler(String msg) {
-        return Thread.ofVirtual().name(msg).start(new Command(this, msg));
+        var thread = commandThreadFactory.newThread(new Command(this, msg));
+        thread.start();
+        return thread;
     }
 }
 
