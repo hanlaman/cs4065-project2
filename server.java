@@ -91,6 +91,7 @@ public class Server {
         public void send(String message) {
             try {
                 var writer = new PrintWriter(socket.getOutputStream(), true);
+                writer.println(message);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -106,7 +107,9 @@ public class Server {
         }
 
         private void listen() throws IOException {
-
+            var reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            var msg = reader.readLine();
+            send(msg);
         }
     }
 }
