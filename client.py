@@ -118,7 +118,7 @@ class MainFrame(Frame):
     def __init__(self, parent, server: Server) -> None:
         Frame.__init__(self, parent)
         self._server = server
-        self._server.send(ProtocolQueries.join('public', userName)) # JOIN public
+        self._server.send(ProtocolQueries.join('Public', userName)) # JOIN public
         self._joinFrame = JoinFrame(self, server, ['Group1', 'Group2', 'Group3', 'Group4', 'Group5']) # PRESET, need to query
         self._joinFrame.grid(row=0, column=0)
         self._sep = ttk.Separator(self, orient='horizontal')
@@ -151,10 +151,48 @@ class ChatsFrame(Frame):
 class ChatFrame(Frame):
     def __init__(self, parent):
         Frame.__init__(self, parent)
-        self._text = Text(self, width=80, height=40)
-        self._text.grid(row=0, column=0)
+        self._users = UsersFrame(self)
+        self._users.grid(row=0, column=0)
+        self._messages = MessagesFrame(self)
+        self._messages.grid(row=0, column=1)
+        self._details = DetailFrame(self)
+        self._details.grid(row=0, column=2)
+
+class UsersFrame(LabelFrame):
+    def __init__(self, parent):
+        LabelFrame.__init__(self, parent, text="Users")
+        self._users = Listbox(self)
+        self._users.grid(row=0, column=0)
+
+class MessagesFrame(LabelFrame):
+    def __init__(self, parent):
+        LabelFrame.__init__(self, parent, text="Messages")
+        self._messages = Listbox(self)
+        self._messages.grid(row=0, column=0)
+
+
+class DetailFrame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        self._senderVar = StringVar()
+        self._senderLabel = Label(self, text="From: ")
+        self._senderLabel.grid(row=0, column=0)
+        self._senderEntry = Entry(self, textvariable=self._senderVar)
+        self._senderEntry.grid(row=0, column=1)
+        self._dateVar = StringVar()
+        self._dateLabel = Label(self, text="Date: ")
+        self._dateLabel.grid(row=1, column=0)
+        self._dateEntry = Entry(self, textvariable=self._dateVar)
+        self._dateEntry.grid(row=1, column=1)
+        self._subjectVar = StringVar()
+        self._subjectLabel = Label(self, text="Subject: ")
+        self._subjectLabel.grid(row=2, column=0)
+        self._subjectEntry = Entry(self, textvariable=self._subjectVar)
+        self._subjectEntry.grid(row=2, column=1)
+        self._content = Text(self, width=20, height=5)
+        self._content.grid(row=3, column=0, columnspan=2)
         self._leaveButton = Button(self, text="Leave", command=self._onLeave)
-        self._leaveButton.grid()
+        self._leaveButton.grid(row=4, column=0, columnspan=2)
     def _onLeave(self):
         pass
 
@@ -169,13 +207,12 @@ class MessagingFrame(Frame):
         self._contentVar = StringVar()
         self._contentLabel = Label(self, text="Content")
         self._contentEntry = Entry(self, textvariable=self._contentVar)
-        self._contentLabel.grid(row=1, column=0)
-        self._contentEntry.grid(row=1, column=1)
+        self._contentLabel.grid(row=0, column=2)
+        self._contentEntry.grid(row=0, column=3)
         self._postButton = Button(self, text="Post", command=self._onPost)
-        self._postButton.grid(row=0, column=2, rowspan=2)
+        self._postButton.grid(row=0, column=4)
     def _onPost(self):
         pass
-
 
 def onResponseReceived(response: str):
     """This will handle messages received from the server"""
