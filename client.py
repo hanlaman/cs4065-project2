@@ -24,26 +24,28 @@ class Server:
             raise RuntimeError("Socket not connected")
         fmsg = f"{msg}\n"
         self._socket.sendall(fmsg.encode('utf-8'))
-    def listen(self, handle: Callable[[str], None]) -> None:
+    def listen(self, handle: Callable[[str], None]) -> Thread:
         if not self._socket:
             raise RuntimeError("Socket not connected")
         def listen_thread():
             buffer = ""
-            try:
-                while self.connected:
+            while self.connected:
+                data: str
+                try:
                     data = self._socket.recv(1024).decode('utf-8')
-                    if not data:
-                        break # Socket closed by server
-                    buffer += data
-                    while '\n' in buffer:
-                        message, buffer = buffer.split('\n', 1)
-                        handle(message)
-            except Exception as e:
-                raise e
-            finally:
-                self.connected = False
-                self._socket.close()
-        Thread(target=listen_thread, daemon=True).start()
+                except Exception as e:
+                    self.connected = False
+                    self._socket = None
+                    break
+                if not data:
+                    break # Socket closed by server
+                buffer += data
+                while '\n' in buffer:
+                    message, buffer = buffer.split('\n', 1)
+                    handle(message)
+        listener = Thread(target=listen_thread, daemon=True)
+        listener.start()
+        return listener
 
 class ProtocolQueries:
     def groups() -> str:

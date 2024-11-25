@@ -3,8 +3,14 @@ import java.net.*;
 import java.util.*;
 
 public class Server {
-    private static final Board publicBoard = new Board("public");
-    private static final Set<Board> privateBoards = new HashSet<>();
+    public static final Map<String, Board> Groups = Map.ofEntries(
+        Map.entry("Public", new Board()),
+        Map.entry("Group1", new Board()),
+        Map.entry("Group2", new Board()),
+        Map.entry("Group3", new Board()),
+        Map.entry("Group4", new Board()),
+        Map.entry("Group5", new Board())
+    );
 
     public static void main(String[] args) {
         try {
@@ -13,103 +19,99 @@ public class Server {
             while (true) { 
                 Socket socket = connectionSocket.accept(); // wait for a connection
                 System.out.println("New connection from " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
-                Thread.ofPlatform().start(new Client(socket)); // start a new thread to handle the connection
+                Thread.startVirtualThread(new Client(socket));
             }
         } 
         catch (IOException ioe) {
             ioe.printStackTrace();
         }
     }
+}
 
-    private static class Message {
-        public final Date PostDate;
-        public final String Sender;
-        public final String Subject;
-        public final String Content;
-
-        public Message(String sender, Date postDate, String subject, String content) {
-            PostDate = postDate;
-            Sender = sender;
-            Subject = subject;
-            Content = content;
+class Client implements Runnable {
+    public Socket socket;
+    private BufferedReader reader;
+    private PrintWriter writer;
+    
+    public Client(Socket socket) {
+        this.socket = socket;
+        try {
+            this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.writer = new PrintWriter(socket.getOutputStream(), true);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
-    private static class Board {
-        public final String Name;
-        public final Map<UUID, Message> Messages = new HashMap<>();
-        private final Set<Client> clients = new HashSet<>();
+    public void send(String message) {
+        writer.print(message + "\n");
+        writer.flush();
+    }
 
-        public Board(String name) {
-            Name = name;
-        }
-
-        public Set<String> UserNames() {
-            var userNames = new HashSet<String>(clients.size());
-            synchronized (clients) {
-                for (var client : clients) {
-                    userNames.add(client.userName);
-                }
+    @Override
+    public void run() {
+        String msg;
+        try {
+            while ((msg = reader.readLine()) != null) {
+                fireOffCmdHandler(msg);
             }
-            return userNames;
-        }
-
-        public void Join(Client client) {
-            clients.add(client);
-            Broadcast("JOIN [" + Name + "] " + client.userName);
-        }
-
-        public void Post(Client sender, String subject, String content) {
-            var message = new Message(sender.userName, new Date(), subject, content);
-            var id = UUID.randomUUID();
-            Messages.put(id, message);
-            Broadcast("POST [" + Name + "] " + "{  }");
-        }
-
-        public void Leave(Client client) {
-            clients.remove(client);
-            Broadcast("LEAVE [" + Name + "] " + client.userName);
-        }
-
-        private void Broadcast(String message) {
-            synchronized (clients) {
-                for (var client : clients) {
-                    client.send(message);
-                }
-            }
+            socket.close();
+        } catch (IOException e) {
+            System.out.println("An error occurred");
         }
     }
 
-    private static class Client implements Runnable {
-        public Socket socket;
-        public String userName = null;
-        
-        public Client(Socket socket) {
-            this.socket = socket;
-        }
+    private void fireOffCmdHandler(String msg) {
+        Thread.startVirtualThread(new Command(this, msg));
+    }
+}
 
-        public void send(String message) {
-            try {
-                var writer = new PrintWriter(socket.getOutputStream(), true);
-                writer.println(message);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+class Command implements Runnable {
+    private final Client caller;
+    private final String text;
+    
+    public Command(Client caller, String text) {
+        this.caller = caller;
+        this.text = text;
+    }
 
-        @Override
-        public void run() {
-            try {
-                listen();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-
-        private void listen() throws IOException {
-            var reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            var msg = reader.readLine();
-            send(msg);
+    @Override
+    public void run() {
+        // handle various commands here
+        if (text.startsWith("GROUPS|")) {
+            runGroups();
+        } else if (text.startsWith("PING")) {
+            caller.send("PING");
         }
     }
+
+    private void runGroups() {
+        var groupNames = Server.Groups.keySet();
+        String response = "GROUPS";
+        for (var groupName : groupNames) {
+            response += "|" + groupName;
+        }
+        caller.send(response);
+    }
+}
+
+class Message {
+    public final Date PostDate;
+    public final String Sender;
+    public final String Subject;
+    public final String Content;
+
+    public Message(String sender, Date postDate, String subject, String content) {
+        PostDate = postDate;
+        Sender = sender;
+        Subject = subject;
+        Content = content;
+    }
+}
+
+class Board {
+    public final Map<UUID, Message> Messages = new HashMap<>();
+    private final Map<String, Client> clients = new HashMap<>();
+
+    public Board() { }
 }
