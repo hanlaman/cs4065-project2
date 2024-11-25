@@ -46,17 +46,17 @@ class Server:
         Thread(target=listen_thread, daemon=True).start()
 
 class ProtocolQueries:
-    def groups():
+    def groups() -> str:
         return "GROUPS"
-    def users(group: str):
+    def users(group: str) -> str:
         return f"USERS|{group}"
-    def join(group: str, name: str):
+    def join(group: str, name: str) -> str:
         return f"JOIN|{group}|{name}"
-    def leave(group: str):
+    def leave(group: str) -> str:
         return f"LEAVE|{group}"
-    def post(group: str, subject: str, content: str):
+    def post(group: str, subject: str, content: str) -> str:
         return f"POST|{group}|{subject}|{content}"
-    def view(id: UUID):
+    def view(id: UUID) -> str:
         return f"VIEW|{id}"
     
 class ProtocolResponses:
@@ -106,6 +106,7 @@ class ConnectionFrame(Frame):
         self._portEntry.grid(row=2, column=1)
         self._connectButton = Button(self, text="Connect", command=self._handleConnect)
         self._connectButton.grid(row=3, column=0, columnspan=2)
+    def getUserName(self) -> str: return self._userNameVar.get()
     def _handleConnect(self):
         if self._hostVar.get() == "" or self._portVar.get() == "": return
         self._server.connect(self._hostVar.get(), int(self._portVar.get()))
@@ -115,15 +116,71 @@ class MainFrame(Frame):
     def __init__(self, parent, server: Server) -> None:
         Frame.__init__(self, parent)
         self._server = server
-        # TODO
-        self._tempLabel = Label(self, text="Main Frame")
-        self._tempLabel.grid(row=0, column=0)
+        self._server.send(ProtocolQueries.join('public', userName)) # JOIN public
+        self._joinFrame = JoinFrame(self, server, ['Group1', 'Group2', 'Group3', 'Group4', 'Group5']) # PRESET, need to query
+        self._joinFrame.grid(row=0, column=0)
+        self._sep = ttk.Separator(self, orient='horizontal')
+        self._sep.grid(row=1, column=0)
+        self._chats = ChatsFrame(self)
+        self._chats.grid(row=2, column=0)
+        self._msgFrame = MessagingFrame(self)
+        self._msgFrame.grid(row=3, column=0)
+
+class JoinFrame(Frame):
+    def __init__(self, parent, server: Server, groups: list[str]) -> None:
+        Frame.__init__(self, parent)
+        self._server = server
+        self._groupVar = StringVar()
+        self._groups = ttk.Combobox(self, values=groups, state="readonly", textvariable=self._groupVar)
+        self._groups.grid(row=0, column=0)
+        self._joinButton = Button(self, text="Join", command=self._handleJoin)
+        self._joinButton.grid(row=0, column=1)
+    def _handleJoin(self) -> None:
+        self._server.send(ProtocolQueries.join(self._groupVar.get(), userName))
+
+class ChatsFrame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        self._nb = ttk.Notebook(self)
+        self._nb.grid(row=0, column=0)
+        self._publicChat = ChatFrame(self)
+        self._nb.add(self._publicChat, text='public')
+
+class ChatFrame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        self._text = Text(self, width=80, height=40)
+        self._text.grid(row=0, column=0)
+        self._leaveButton = Button(self, text="Leave", command=self._onLeave)
+        self._leaveButton.grid()
+    def _onLeave(self):
+        pass
+
+class MessagingFrame(Frame):
+    def __init__(self, parent):
+        Frame.__init__(self, parent)
+        self._subjectVar = StringVar()
+        self._subjectLabel = Label(self, text="Subject")
+        self._subjectEntry = Entry(self, textvariable=self._subjectVar)
+        self._subjectLabel.grid(row=0, column=0)
+        self._subjectEntry.grid(row=0, column=1)
+        self._contentVar = StringVar()
+        self._contentLabel = Label(self, text="Content")
+        self._contentEntry = Entry(self, textvariable=self._contentVar)
+        self._contentLabel.grid(row=1, column=0)
+        self._contentEntry.grid(row=1, column=1)
+        self._postButton = Button(self, text="Post", command=self._onPost)
+        self._postButton.grid(row=0, column=2, rowspan=2)
+    def _onPost(self):
+        pass
+
 
 def onResponseReceived(response: str):
     """This will handle messages received from the server"""
     print(response)
 
 def onConnected():
+    # start listening for server messages
     server.listen(onResponseReceived)
     # Swap connection frame with main
     conn.destroy()
@@ -132,6 +189,8 @@ def onConnected():
 
 root = Tk()
 root.title("Client")
+
+userName: str | None = None
 server = Server()
 
 conn = ConnectionFrame(root, server, onConnected)
