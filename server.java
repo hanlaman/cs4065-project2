@@ -247,7 +247,12 @@ class Board {
 
     public Integer[] GetLastTwoMessageIds() {
         var messages = new ArrayList<>(Messages.entrySet());
-        Collections.sort(messages, (o1, o2) -> o2.getValue().PostDate.compareTo(o1.getValue().PostDate)); // sort reversed
-        return messages.stream().limit(2).map(e -> e.getKey()).toArray(Integer[]::new);
+        Collections.sort(messages, (left, right) -> right.getValue().PostDate.compareTo(left.getValue().PostDate)); // sort reversed
+        return messages
+            .stream()
+            .limit(2)
+            .sorted((left, right) -> left.getValue().PostDate.compareTo(right.getValue().PostDate))
+            .map(e -> e.getKey())
+            .toArray(Integer[]::new);
     }
 }

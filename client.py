@@ -154,10 +154,15 @@ class MainFrame(Frame):
             if frame is not None:
                 frame.remove_user(name)
     def handleMessage(self, group: str, msgId: int):
-        pass
+        frame = self._groups.groups.get(group)
+        if frame is None:
+            return
+        frame.add_msg(msgId)
     def handleView(self, group: str, id: int, sender: str, post_date: datetime, subject: str, content: str):
-        pass
-
+        frame = self._groups.groups.get(group)
+        if frame is None:
+            return
+        frame.add_msg_contents(id, sender, post_date, subject, content)
 
 class JoinFrame(Frame):
     def __init__(self, parent, groups: list[str], userName: str) -> None:
@@ -199,14 +204,14 @@ class GroupsFrame(Frame):
     def current(self):
         name = self._nb.tab(self._nb.select(), 'text')
         return name, self.groups[name]
-    def add(self, groupName):
+    def add(self, groupName: str):
         if groupName in self.groups:
             return
-        frame = GroupFrame(self._nb, lambda: self._onLeave(groupName))
+        frame = GroupFrame(self._nb, groupName, lambda: self._onLeave(groupName))
         self._nb.add(frame, text=groupName)
         self.groups[groupName] = frame
         return frame
-    def remove(self, groupName):
+    def remove(self, groupName: str):
         if groupName not in self.groups:
             return
         frame = self.groups[groupName]
@@ -214,10 +219,10 @@ class GroupsFrame(Frame):
         del self.groups[groupName]
 
 class GroupFrame(Frame):
-    def __init__(self, parent, onLeave: Callable[[], None]):
+    def __init__(self, parent, name: str, onLeave: Callable[[], None]):
         Frame.__init__(self, parent)
+        self.name = name
         self._messages: dict[int, tuple[str, datetime, str, str] | None] = {}
-        self._currentMsg: int | None = None
         self._users = UsersFrame(self)
         self._messagesFrame = MessagesFrame(self, self._handleMsgSelectionChanged)
         self._details = DetailFrame(self, onLeave)
@@ -227,7 +232,19 @@ class GroupFrame(Frame):
         self._messagesFrame.grid(row=0, column=1)
         self._details.grid(row=0, column=2)
     def _handleMsgSelectionChanged(self, msgId: int | None):
-        self._currentMsg = msgId
+        if msgId is None:
+            self._details.clear()
+            return
+        msgTuple = self._messages.get(msgId)
+        if msgTuple is None:
+            self._details.clear()
+            server.send(createViewQuery(self.name, msgId))
+            return
+        
+        self._details.setSender(msgTuple[0])
+        self._details.setFromDate(msgTuple[1])
+        self._details.setSubject(msgTuple[2])
+        self._details.setContent(msgTuple[3])
     def add_user(self, user: str):
         self._users.add(user)
     def remove_user(self, user: str):
@@ -237,6 +254,12 @@ class GroupFrame(Frame):
         self._messagesFrame.add(id)
     def add_msg_contents(self, id: int, sender: str, post_date: datetime, subject: str, content: str):
         self._messages[id] = [sender, post_date, subject, content]
+        curr = self._messagesFrame.current()
+        if id == curr:
+            self._details.setSender(sender)
+            self._details.setFromDate(post_date)
+            self._details.setSubject(subject)
+            self._details.setContent(content)
     
 
 class UsersFrame(LabelFrame):
@@ -270,38 +293,32 @@ class MessagesFrame(LabelFrame):
     def __init__(self, parent, onMessageSelectionChanged: Callable[[int | None], None]):
         LabelFrame.__init__(self, parent, text="Messages")
         self._onMessageSelectionChanged = onMessageSelectionChanged
-        self._messages: list[str] = []
         # create components
-        self._messagesVar = StringVar(value=self._messages)
-        self._messagesBox = Listbox(self, selectmode='single', listvariable=self._messagesVar)
+        self._messagesBox = Listbox(self, selectmode='single')
         self._scroll = Scrollbar(self)
         self._messagesBox.bind("<<ListboxSelect>>", self._onListboxSelect) # bind selection event
         # configure scrolling
         self._messagesBox.config(yscrollcommand=self._scroll.set)
         self._scroll.config(command=self._messagesBox.yview)
         self._placeFrames() # place frames
-    def _onListboxSelect(self, event):
-        indices: list[int] = event.widget.curselection()
-        if len(indices) <= 0:
-            return
-        index = indices[0]
-        if index:
-            id = event.widget.get(index)
-            self._onMessageSelectionChanged(int(id))
-        else:
-            self._onMessageSelectionChanged(None)
     def _placeFrames(self):
         self._messagesBox.pack(side='left', fill='both', expand=True)
         self._scroll.pack(side='right', fill='y')
+    def current(self):
+        indices = self._messagesBox.curselection()
+        if len(indices) <= 0:
+            return None
+        index = indices[0]
+        item: str = self._messagesBox.get(index)
+        return int(item)
+    def _onListboxSelect(self, _):
+        self._onMessageSelectionChanged(self.current())
     def add(self, messageId: str):
-        self._messages.append(messageId)
-        self._messagesVar.set(",".join(self._messages))
-
+        self._messagesBox.insert(END, str(messageId))
 
 class DetailFrame(Frame):
     def __init__(self, parent, onLeave: Callable[[], None]):
         Frame.__init__(self, parent)
-        self._onLeave = onLeave
         self._senderVar = StringVar()
         self._senderLabel = Label(self, text="From: ")
         self._senderEntry = Entry(self, textvariable=self._senderVar, state=['readonly'])
@@ -315,44 +332,47 @@ class DetailFrame(Frame):
         self._subjectEntry = Entry(self, textvariable=self._subjectVar, state=['readonly'])
 
         self._content = Text(self, width=20, height=5)
-        self._leaveButton = Button(self, text="Leave", command=self._onLeaveClicked)
+        self._leaveButton = Button(self, text="Leave", command=onLeave)
 
         self._placeFrames()
     def _placeFrames(self):
         self._senderLabel.grid(row=0, column=0)
         self._senderEntry.grid(row=0, column=1)
+
         self._dateLabel.grid(row=1, column=0)
-        self._subjectLabel.grid(row=2, column=0)
         self._dateEntry.grid(row=1, column=1)
+
+        self._subjectLabel.grid(row=2, column=0)
         self._subjectEntry.grid(row=2, column=1)
+
         self._content.grid(row=3, column=0, columnspan=2)
         self._leaveButton.grid(row=4, column=0, columnspan=2)
-    def _onLeaveClicked(self):
-        self._onLeave()
     def setSender(self, val: str = ""):
         self._senderVar.set(val)
-    def setFrom(self, val: datetime | None = None):
-        if val is None:
-            self._senderVar.set("")
-        else:
-            self._senderVar.set(val.strftime("%I:%M:%S %p, %b %d, %Y"))
+    def setFromDate(self, val: datetime | None = None):
+        self._dateVar.set(val.strftime("%I:%M:%S %p, %b %d, %Y") if val is not None else "")
     def setSubject(self, val: str = ""):
         self._subjectVar.set(val)
     def setContent(self, val: str = ""):
         self._content.delete("1.0", END) # Clear
         self._content.insert(END, val) # Set new
+    def clear(self):
+        self.setSender()
+        self.setFromDate()
+        self.setSubject()
+        self.setContent()
 
 class MessagingFrame(Frame):
-    def __init__(self, parent, onPost: Callable[[str, str], None]):
+    def __init__(self, parent, onPostClicked: Callable[[str, str], None]):
         Frame.__init__(self, parent)
-        self._onPost = onPost
+        self._onPostClicked = onPostClicked
         self._subjectVar = StringVar()
         self._subjectLabel = Label(self, text="Subject")
         self._subjectEntry = Entry(self, textvariable=self._subjectVar)
         self._contentVar = StringVar()
         self._contentLabel = Label(self, text="Content")
         self._contentEntry = Entry(self, textvariable=self._contentVar)
-        self._postButton = Button(self, text="Post", command=self._onPostClicked)
+        self._postButton = Button(self, text="Post", command=self._handlePostClicked)
         self._placeFrames()
     def _placeFrames(self):
         self._subjectLabel.grid(row=0, column=0)
@@ -360,12 +380,12 @@ class MessagingFrame(Frame):
         self._contentLabel.grid(row=0, column=2)
         self._contentEntry.grid(row=0, column=3)
         self._postButton.grid(row=0, column=4)
-    def _onPostClicked(self):
+    def _handlePostClicked(self):
         subject = self._subjectVar.get()
         content = self._contentVar.get()
         if subject == "" or content == "":
             return
-        self._onPost(subject, content)
+        self._onPostClicked(subject, content)
         self._clearEntries()
     def _clearEntries(self):
         self._subjectEntry.delete(0, END)
