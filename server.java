@@ -102,11 +102,6 @@ class Command implements Runnable {
             var nameInGroup = parts[2];
             runJoinGroup(group, nameInGroup);
         }
-        else if (text.startsWith("USERS|")) {
-            var parts = text.split("\\|");
-            var group = parts[1];
-            runUsersInGroup(group);
-        }
         else if (text.startsWith("POST|")) {
             var parts = text.split("\\|");
             var group = parts[1];
@@ -146,11 +141,18 @@ class Command implements Runnable {
 
         board.Join(caller, name);
         caller.boards.add(board);
+        caller.send("JOIN|" + group + "|" + name);
 
         // send last two messages back
         var ids = board.GetLastTwoMessageIds();
         if (ids.length > 0) caller.send("MESSAGE|" + group + "|" + Integer.toUnsignedString(ids[0]));
         if (ids.length > 1) caller.send("MESSAGE|" + group + "|" + Integer.toUnsignedString(ids[1]));
+
+        // send all users in group
+        for (var user : board.Users()) {
+            if (!name.equals(user))
+                caller.send("JOIN|" + group + "|" + user);
+        }
     }
 
     private void runPost(String group, String subject, String content) {
@@ -176,20 +178,7 @@ class Command implements Runnable {
         if (!board.Messages.containsKey(id)) return;
         var msg = board.Messages.get(id);
 
-        caller.send("VIEW|" + Integer.toUnsignedString(id) + "|" + msg.Sender + "|" + msg.PostDate.format(DateTimeFormatter.ISO_DATE_TIME) + "|" + msg.Subject + "|" + msg.Content);
-    }
-
-    private void runUsersInGroup(String group) {
-        if (!Server.Groups.containsKey(group)) return;
-        var board = Server.Groups.get(group);
-        if (!caller.boards.contains(board)) return;
-        
-        String response = "USERS|" + group;
-        for (var user : board.Users()) {
-            response += "|" + user;
-        }
-
-        caller.send(response);
+        caller.send("VIEW|" + group + "|" + Integer.toUnsignedString(id) + "|" + msg.Sender + "|" + msg.PostDate.format(DateTimeFormatter.ISO_DATE_TIME) + "|" + msg.Subject + "|" + msg.Content);
     }
 }
 
@@ -220,10 +209,10 @@ class Board {
 
     public void Join(Client client, String name) {
         synchronized (clients) {
-            clients.put(client, name);
             for (var other : clients.keySet()) {
                 other.send("JOIN|" + boardName + "|" + name);
             }
+            clients.put(client, name);
         }
     }
 
