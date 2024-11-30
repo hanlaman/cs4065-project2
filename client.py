@@ -166,7 +166,6 @@ class MainFrame(Frame):
             return
         frame.add_msg_contents(id, sender, post_date, subject, content)
     def exit(self):
-        self._groups.leaveAll()
         server.send(createExitQuery())
 
 class JoinFrame(Frame):
@@ -222,9 +221,6 @@ class GroupsFrame(Frame):
         frame = self.groups[groupName]
         self._nb.forget(frame)
         del self.groups[groupName]
-    def leaveAll(self):
-        for g in self.groups:
-            server.send(createLeaveQuery(g))
 
 class GroupFrame(Frame):
     def __init__(self, parent, name: str, onLeave: Callable[[], None]):

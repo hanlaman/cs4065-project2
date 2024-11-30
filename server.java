@@ -6,6 +6,8 @@ import java.util.*;
 import java.util.concurrent.ThreadFactory;
 
 public class Server {
+    public static final ThreadFactory clientThreadFactory = Thread.ofVirtual().factory();
+
     public static final Map<String, Board> Groups = Map.ofEntries(
         Map.entry("Public", new Board("Public")),
         Map.entry("Group1", new Board("Group1")),
@@ -22,9 +24,9 @@ public class Server {
             while (true) { 
                 Socket socket = connectionSocket.accept(); // wait for a connection
                 System.out.println("New connection from " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
-                Thread.ofVirtual()
-                    .name("Client-" + socket.getInetAddress().getHostAddress() + ":" + socket.getPort())
-                    .start(new Client(socket));
+                Thread clientThread = clientThreadFactory.newThread(new Client(socket));
+                clientThread.setName("Client-" + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
+                clientThread.start();
             }
         } 
         catch (IOException ioe) {
@@ -62,24 +64,46 @@ class Client implements Runnable {
 
     @Override
     public void run() {
-        String msg;
-        try {
-            while ((msg = reader.readLine()) != null) {
-                if (msg.equalsIgnoreCase("EXIT")) break;
-                fireOffCmdHandler(msg);
+        var threads = new ArrayList<Thread>();
+        while (true) { 
+            String msg;
+            try {
+                msg = reader.readLine();
+            } catch (IOException e) {
+                break;
             }
-            socket.close();
-        } catch (IOException e) {
-            for (var board : boards) {
-                fireOffCmdHandler("LEAVE|" + board);
+            if (msg == null) break;
+            System.out.println(socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + " ? " + msg);
+            if (msg.equals("EXIT")) break;
+            Thread t = handleMsg(msg);
+            if (t != null) threads.add(t);
+        }
+        
+        // create commands to leave all boards
+        for (var board : boards) {
+            Thread t = handleMsg("LEAVE|" + board.boardName);
+            if (t != null) threads.add(t);
+        }
+
+        // join all msg threads if still active
+        for (var thread : threads) {
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                break;
             }
         }
+
         System.out.println("Closing connection from " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
+        try {
+            socket.close();
+        } catch (IOException e) { }
     }
 
-    private Thread fireOffCmdHandler(String msg) {
+    private Thread handleMsg(String msg) {
         var thread = commandThreadFactory.newThread(new Command(this, msg));
-        System.out.println(socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + " ? " + msg);
+        if (thread == null) return null;
+        thread.setName(msg);
         thread.start();
         return thread;
     }
