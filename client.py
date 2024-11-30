@@ -21,7 +21,7 @@ class Server:
         if not self._socket:
             raise RuntimeError("Socket not connected")
         fmsg = f"{msg}\n"
-        print(msg)
+        print(f"> {msg}")
         self._socket.sendall(fmsg.encode('utf-8'))
     def listen(self, handle: Callable[[str], None]) -> Thread:
         if not self._socket:
@@ -41,6 +41,7 @@ class Server:
                 buffer += data
                 while '\n' in buffer:
                     message, buffer = buffer.split('\n', 1)
+                    print(f"! {message}")
                     handle(message)
         listener = Thread(target=listen_thread, daemon=True)
         listener.start()
@@ -399,7 +400,6 @@ class MessagingFrame(Frame):
         self._contentEntry.delete(0, END)
 
 def onResponseReceived(main: MainFrame, response: str):
-    print(f'! {response}') # Log the response from the server
     if response.startswith("GROUPS|"):
         groups = parseGroupsMsg(response)
         main.handleGroups(groups)
