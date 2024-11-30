@@ -21,6 +21,7 @@ class Server:
         if not self._socket:
             raise RuntimeError("Socket not connected")
         fmsg = f"{msg}\n"
+        print(msg)
         self._socket.sendall(fmsg.encode('utf-8'))
     def listen(self, handle: Callable[[str], None]) -> Thread:
         if not self._socket:
@@ -163,6 +164,9 @@ class MainFrame(Frame):
         if frame is None:
             return
         frame.add_msg_contents(id, sender, post_date, subject, content)
+    def exit(self):
+        self._groups.leaveAll()
+        server.send(createExitQuery())
 
 class JoinFrame(Frame):
     def __init__(self, parent, groups: list[str], userName: str) -> None:
@@ -217,6 +221,9 @@ class GroupsFrame(Frame):
         frame = self.groups[groupName]
         self._nb.forget(frame)
         del self.groups[groupName]
+    def leaveAll(self):
+        for g in self.groups:
+            server.send(createLeaveQuery(g))
 
 class GroupFrame(Frame):
     def __init__(self, parent, name: str, onLeave: Callable[[], None]):
@@ -412,6 +419,7 @@ def onResponseReceived(main: MainFrame, response: str):
 # Define a method to handle the ui connecting
 def onConnected():
     userName = conn.getUserName() # fetch the user name from the connection frame
+    global main
     main = MainFrame(root, userName) # Create the main frame
     server.listen(lambda msg : onResponseReceived(main, msg)) # start listening for server messages
     conn.destroy() # Remove the connection frame
@@ -429,6 +437,8 @@ conn.grid(row=0, column=0) # place the connection frame in root
 # Define a close function when exiting
 def onClosing():
     if server.connected:
+        if main is not None:
+            main.exit()
         server.disconnect() # close the socket
     root.destroy() # close the ui window
 root.protocol("WM_DELETE_WINDOW", onClosing) # Register the function handler

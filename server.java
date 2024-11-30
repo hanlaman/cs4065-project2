@@ -54,6 +54,7 @@ class Client implements Runnable {
 
     public void send(String message) {
         synchronized (this.lock) {
+            System.out.println(socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + " < " + message);
             writer.print(message + "\n");
             writer.flush();
         }
@@ -73,10 +74,12 @@ class Client implements Runnable {
                 fireOffCmdHandler("LEAVE|" + board);
             }
         }
+        System.out.println("Closing connection from " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
     }
 
     private Thread fireOffCmdHandler(String msg) {
         var thread = commandThreadFactory.newThread(new Command(this, msg));
+        System.out.println(socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + " ? " + msg);
         thread.start();
         return thread;
     }
