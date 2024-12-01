@@ -7,46 +7,51 @@ from datetime import datetime
 
 class Server:
     def __init__(self) -> None:
-        self._socket: socket | None = None
-        self.connected = False
+        self._socket: socket | None = None # socket object for communication
+        self.connected = False # connection status
     def connect(self, host: str, port: int):
-        self._socket = socket(AF_INET, SOCK_STREAM)
-        self.connected = self._socket.connect_ex((host, port)) == 0
+        self._socket = socket(AF_INET, SOCK_STREAM) # create a TCP/IP socket
+        self.connected = self._socket.connect_ex((host, port)) == 0 # attempt connection
     def disconnect(self):
         self.connected = False
         if self._socket:
             self._socket.close()
             self._socket = None
+    # send a message to the server
     def send(self, msg: str) -> None:
         if not self._socket:
             raise RuntimeError("Socket not connected")
-        fmsg = f"{msg}\n"
+        fmsg = f"{msg}\n" # append newline
         print(f"> {msg}")
-        self._socket.sendall(fmsg.encode('utf-8'))
+        self._socket.sendall(fmsg.encode('utf-8')) # send encoded message 
+    # listen for incoming messages from the server 
     def listen(self, handle: Callable[[str], None]) -> Thread:
         if not self._socket:
             raise RuntimeError("Socket not connected")
         def listen_thread():
-            buffer = ""
+            buffer = "" # buffer for partial messages 
             while self.connected:
                 data: str
                 try:
+                    # receive and decode data 
                     data = self._socket.recv(1024).decode('utf-8')
                 except Exception as e:
+                    # handle connection errors 
                     self.connected = False
                     self._socket = None
                     break
-                if not data:
+                if not data: # if no data received, server closes connection 
                     break # Socket closed by server
                 buffer += data
-                while '\n' in buffer:
+                while '\n' in buffer: # process complete messages 
                     message, buffer = buffer.split('\n', 1)
                     print(f"! {message}")
                     handle(message)
+       # start listening in a separate thread
         listener = Thread(target=listen_thread, daemon=True)
         listener.start()
         return listener
-
+# functions to create queries for the server
 def createGroupsQuery() -> str:
     return "GROUPS"
 def createJoinQuery(group: str, name: str) -> str:
@@ -60,6 +65,7 @@ def createViewQuery(group: str, id: int) -> str:
 def createExitQuery():
     return 'EXIT'
 
+# functions to parse server responses 
 def parseGroupsMsg(msg: str):
     # GROUPS|g1|g2|g3|...
     return msg.split("|")[1:]
@@ -79,10 +85,12 @@ def parseViewMsg(msg: str) -> tuple[str, int, str, datetime, str, str]:
     # VIEW|group|id|sender|postDate|subject|contents
     parts = msg.split("|")
     return [parts[1], int(parts[2]), parts[3], datetime.fromisoformat(parts[4]), parts[5], parts[6]]
-    
+
+# connectionframe manages connection input and setup GUI
 class ConnectionFrame(Frame):
     def __init__(self, parent, onConnected: Callable[[], None]) -> None:
         Frame.__init__(self, parent)
+        # input fields 
         self._onConnected = onConnected
         self._userNameVar = StringVar()
         self._userNameLabel = Label(self, text="User Name")
@@ -95,6 +103,7 @@ class ConnectionFrame(Frame):
         self._portEntry = Entry(self, textvariable=self._portVar)
         self._connectButton = Button(self, text="Connect", command=self._handleConnect)
         self._placeFrames()
+    # arrange components in grid 
     def _placeFrames(self):
         self._userNameLabel.grid(row=0, column=0)
         self._userNameEntry.grid(row=0, column=1)
@@ -107,10 +116,10 @@ class ConnectionFrame(Frame):
         host = self._hostVar.get()
         portStr = self._portVar.get()
         if self._hostVar.get() == "" or self._portVar.get() == "":
-            return
+            return # do nothing if host or port is empty 
         server.connect(host, int(portStr))
         if (server.connected):
-            self._onConnected()
+            self._onConnected() # callback if connected 
     def getUserName(self) -> str: return self._userNameVar.get()
 
 class MainFrame(Frame):
