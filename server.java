@@ -5,9 +5,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
 
+// server class to manage client connections and message boards 
 public class Server {
+    // factory for creating virtual threads for clients
     public static final ThreadFactory clientThreadFactory = Thread.ofVirtual().factory();
 
+    // predefined message boards available on the server
     public static final Map<String, Board> Groups = Map.ofEntries(
         Map.entry("Public", new Board("Public")),
         Map.entry("Group1", new Board("Group1")),
@@ -17,13 +20,16 @@ public class Server {
         Map.entry("Group5", new Board("Group5"))
     );
 
+    // main method to initialize the server and handle client connections
     public static void main(String[] args) {
         try {
+            // create a server socket on an available port
             ServerSocket connectionSocket = new ServerSocket(0);
             System.out.println("Waiting for connections on port " + connectionSocket.getLocalPort());
             while (true) { 
                 Socket socket = connectionSocket.accept(); // wait for a connection
                 System.out.println("New connection from " + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
+                // start a new thread to handle the connected client 
                 Thread clientThread = clientThreadFactory.newThread(new Client(socket));
                 clientThread.setName("Client-" + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
                 clientThread.start();
@@ -35,14 +41,16 @@ public class Server {
     }
 }
 
+// client class to handle communication with an individual client 
 class Client implements Runnable {
-    private final ThreadFactory commandThreadFactory;
-    private final Object lock = new Object();
+    private final ThreadFactory commandThreadFactory; // factory for creating threads for commands
+    private final Object lock = new Object(); // lock for thread synchronization
     public Socket socket;
-    private BufferedReader reader;
-    private PrintWriter writer;
-    public final Set<Board> boards = new HashSet<>();
-    
+    private BufferedReader reader; // reader for incoming client messages 
+    private PrintWriter writer; // writer for sending messages to client 
+    public final Set<Board> boards = new HashSet<>(); // set of boards that the client has joined 
+
+    // constructor initializes client socket and I/O streams
     public Client(Socket socket) {
         this.socket = socket;
         commandThreadFactory = Thread.ofVirtual().factory();
@@ -54,6 +62,7 @@ class Client implements Runnable {
         }
     }
 
+    // method to send a message to client 
     public void send(String message) {
         synchronized (this.lock) {
             System.out.println(socket.getInetAddress().getHostAddress() + ":" + socket.getPort() + " < " + message);
@@ -62,12 +71,14 @@ class Client implements Runnable {
         }
     }
 
+    // main loop for handling client messages 
     @Override
     public void run() {
         var threads = new ArrayList<Thread>();
         while (true) { 
             String msg;
             try {
+                // read message from client 
                 msg = reader.readLine();
             } catch (IOException e) {
                 break;
@@ -100,6 +111,7 @@ class Client implements Runnable {
         } catch (IOException e) { }
     }
 
+    // handle message from client by creating a new command thread 
     private Thread handleMsg(String msg) {
         var thread = commandThreadFactory.newThread(new Command(this, msg));
         if (thread == null) return null;
@@ -109,15 +121,17 @@ class Client implements Runnable {
     }
 }
 
+// command class to execute client commands 
 class Command implements Runnable {
-    private final Client caller;
-    private final String text;
+    private final Client caller; // reference to the client issuing the command
+    private final String text; // command text 
     
     public Command(Client caller, String text) {
         this.caller = caller;
         this.text = text;
     }
 
+    // executes the command based on its type 
     @Override
     public void run() {
         if (text.startsWith("GROUPS")) {
@@ -152,6 +166,7 @@ class Command implements Runnable {
         }
     }
 
+    // handles the GROUPS command 
     private void runGroups() {
         var groupNames = Server.Groups.keySet();
         String response = "GROUPS";
@@ -161,6 +176,7 @@ class Command implements Runnable {
         caller.send(response);
     }
 
+    // handles the JOIN command 
     private void runJoinGroup(String group, String name) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
@@ -182,6 +198,7 @@ class Command implements Runnable {
         }
     }
 
+    // handles the POST command 
     private void runPost(String group, String subject, String content) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
@@ -189,6 +206,7 @@ class Command implements Runnable {
         board.Post(caller, subject, content);
     }
 
+    // handles the LEAVE command 
     private void runLeave(String group) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
@@ -198,6 +216,7 @@ class Command implements Runnable {
         caller.boards.remove(board);
     }
 
+    // handles the VIEW command 
     private void runView(String group, Integer id) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
@@ -209,6 +228,7 @@ class Command implements Runnable {
     }
 }
 
+// message class represents a single message in a board 
 class Message {
     public final LocalDateTime PostDate;
     public final String Sender;
@@ -223,9 +243,10 @@ class Message {
     }
 }
 
+// board class represents a message board where clients can post messages 
 class Board {
     public final String boardName;
-    private final Random rnd;
+    private final Random rnd; // random number generator for message IDs
     public final Map<Integer, Message> Messages = new HashMap<>();
     private final Map<Client, String> clients = new HashMap<>();
 
@@ -234,6 +255,7 @@ class Board {
         boardName = name;
     }
 
+    // adds a client to the board 
     public void Join(Client client, String name) {
         synchronized (clients) {
             for (var other : clients.keySet()) {
@@ -243,6 +265,7 @@ class Board {
         }
     }
 
+    // removes a client from the board 
     public void Leave(Client client) {
         if (!clients.containsKey(client)) return;
         synchronized (clients) {
@@ -254,6 +277,7 @@ class Board {
         }
     }
 
+    // posts a message to the board 
     public void Post(Client client, String subject, String content) {
         if (!clients.containsKey(client)) return;
         var id = rnd.nextInt();
@@ -272,6 +296,7 @@ class Board {
         return clients.values();
     }
 
+    // gets the last two message IDs from the board 
     public Integer[] GetLastTwoMessageIds() {
         var messages = new ArrayList<>(Messages.entrySet());
         Collections.sort(messages, (left, right) -> right.getValue().PostDate.compareTo(left.getValue().PostDate)); // sort reversed
