@@ -37,5 +37,11 @@ The system supports Java-based server implementation and Python-based client app
 - You can now post messages using the GUI and also look at users and join users from the top tab. 
 - Open a new instance of the client using the terminal to add multiple users to a group
 
+## Issues we faced
+- We faced some issues with the GUI setup and getting all the windows in the right spot and displaying the output of the messages correctly. 
+- After looking into more documentation of tkinter we figured out how to get a good GUI that works with all the functions and also display the messages
+- We had a parsing error in python during our test runs but this was fixed by updating to the latest version of python 
+- Also faced some issues with Date Time for the posted messages but fixed this with some minor changes in code to fix the formatting. 
+
 
 
