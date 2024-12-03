@@ -33,4 +33,3 @@ The system supports Java-based server implementation and Python-based client app
 - Run the GUI client:
   - `python client.py`
 - The GUI should open in a new window. It will prompt you with a username, host, and port.
-- Please choose any username. The host is localhost, and the port will be given to you in the first terminal. 
