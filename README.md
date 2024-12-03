@@ -33,3 +33,9 @@ The system supports Java-based server implementation and Python-based client app
 - Run the GUI client:
   - `python client.py`
 - The GUI should open in a new window. It will prompt you with a username, host, and port.
+- Enter a username of your choice, put "localhost" for host and then input the port that the terminal displayed after you setup the server
+- You can now post messages using the GUI and also look at users and join users from the top tab. 
+- Open a new instance of the client using the terminal to add multiple users to a group
+
+
+
