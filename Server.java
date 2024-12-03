@@ -166,64 +166,65 @@ class Command implements Runnable {
         }
     }
 
-    // handles the GROUPS command 
+    // handles the GROUPS query 
     private void runGroups() {
         var groupNames = Server.Groups.keySet();
-        String response = "GROUPS";
+        String response = "GROUPS"; // construct group response
         for (var groupName : groupNames) {
-            response += "|" + groupName;
+            response += "|" + groupName; // append all group names
         }
         caller.send(response);
     }
 
-    // handles the JOIN command 
+    // handles the JOIN query 
     private void runJoinGroup(String group, String name) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
         if (caller.boards.contains(board)) return;
 
-        board.Join(caller, name);
-        caller.boards.add(board);
-        caller.send("JOIN|" + group + "|" + name);
+        board.Join(caller, name); // join the caller client to the board
+        caller.boards.add(board); // add the board to the callers memory
+        caller.send("JOIN|" + group + "|" + name); // notify caller they've joined the group
 
         // send last two messages back
         var ids = board.GetLastTwoMessageIds();
         if (ids.length > 0) caller.send("MESSAGE|" + group + "|" + Integer.toUnsignedString(ids[0]));
         if (ids.length > 1) caller.send("MESSAGE|" + group + "|" + Integer.toUnsignedString(ids[1]));
 
-        // send all users in group
+        // notify client of all users in group
         for (var user : board.Users()) {
             if (!name.equals(user))
                 caller.send("JOIN|" + group + "|" + user);
         }
     }
 
-    // handles the POST command 
+    // handles the POST query 
     private void runPost(String group, String subject, String content) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
 
-        board.Post(caller, subject, content);
+        board.Post(caller, subject, content); // post to the board
     }
 
-    // handles the LEAVE command 
+    // handles the LEAVE query 
     private void runLeave(String group) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
         if (!caller.boards.contains(board)) return;
 
-        board.Leave(caller);
-        caller.boards.remove(board);
+        board.Leave(caller); // leave the board
+        caller.boards.remove(board); // stop tracking the board on the client
     }
 
-    // handles the VIEW command 
+    // handles the VIEW query 
     private void runView(String group, Integer id) {
         if (!Server.Groups.containsKey(group)) return;
         var board = Server.Groups.get(group);
         if (!caller.boards.contains(board)) return;
         if (!board.Messages.containsKey(id)) return;
-        var msg = board.Messages.get(id);
+        var msg = board.Messages.get(id); // get the message
 
+        // send contents to the client
         caller.send("VIEW|" + group + "|" + Integer.toUnsignedString(id) + "|" + msg.Sender + "|" + DateTimeFormatter.ISO_INSTANT.format(msg.PostDate) + "|" + msg.Subject + "|" + msg.Content);
     }
 }
@@ -259,9 +260,9 @@ class Board {
     public void Join(Client client, String name) {
         synchronized (clients) {
             for (var other : clients.keySet()) {
-                other.send("JOIN|" + boardName + "|" + name);
+                other.send("JOIN|" + boardName + "|" + name); // notify all existing board clients of a join
             }
-            clients.put(client, name);
+            clients.put(client, name); // track new client
         }
     }
 
@@ -271,17 +272,17 @@ class Board {
         synchronized (clients) {
             var name = clients.get(client);
             for (var other : clients.keySet()) {
-                other.send("LEAVE|" + boardName + "|" + name);
+                other.send("LEAVE|" + boardName + "|" + name); // notify all board client of a leave
             }
-            clients.remove(client);
+            clients.remove(client); // stop tracking client on board
         }
     }
 
     // posts a message to the board 
     public void Post(Client client, String subject, String content) {
         if (!clients.containsKey(client)) return;
-        var id = rnd.nextInt();
-        var message = new Message(clients.get(client), Instant.now(), subject, content);
+        var id = rnd.nextInt(); // generate new message id
+        var message = new Message(clients.get(client), Instant.now(), subject, content); // create new message structure
         Messages.put(id, message);
 
         // notify others of a new message
@@ -293,18 +294,18 @@ class Board {
     }
 
     public Collection<String> Users() {
-        return clients.values();
+        return clients.values(); // get list of usernames
     }
 
     // gets the last two message IDs from the board 
     public Integer[] GetLastTwoMessageIds() {
         var messages = new ArrayList<>(Messages.entrySet());
-        Collections.sort(messages, (left, right) -> right.getValue().PostDate.compareTo(left.getValue().PostDate)); // sort reversed
+        Collections.sort(messages, (left, right) -> right.getValue().PostDate.compareTo(left.getValue().PostDate)); // sort reversed by post date
         return messages
             .stream()
-            .limit(2)
-            .sorted((left, right) -> left.getValue().PostDate.compareTo(right.getValue().PostDate))
-            .map(e -> e.getKey())
-            .toArray(Integer[]::new);
+            .limit(2) // get most recent two
+            .sorted((left, right) -> left.getValue().PostDate.compareTo(right.getValue().PostDate)) // sort ascending post date
+            .map(e -> e.getKey()) // get the message ids
+            .toArray(Integer[]::new); // send into an array
     }
 }
