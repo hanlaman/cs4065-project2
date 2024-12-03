@@ -11,19 +11,6 @@ This project implements a client-server bulletin board system using sockets. The
 
 The system supports Java-based server implementation and Python-based client applications.
 
-## Features
-#### Server
-- Multithreading: Handles multiple client connections simultaneously.
-- Group Management: Supports public and private groups.
-- Message Storage: Maintains and retrieves posted messages with metadata.
-- Notifications: Broadcasts user join/leave events to group members.
-- Protocol Support: Implements a custom text-based protocol for client-server communication.
-#### Client
-- Connection Management: Connects to the server using a specified host and port.
-- Message Handling: Supports posting, retrieving, and viewing messages.
-- Group Features: Joins public/private groups, retrieves user lists, and leaves groups.
-- GUI and CLI Options: Provides both a GUI (using Python's tkinter) and CLI-based interface.
-
 ## Prerequisites
 #### Server
 - Java Development Kit (JDK) 17 or higher
