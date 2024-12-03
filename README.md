@@ -31,13 +31,14 @@ The system supports Java-based server implementation and Python-based client app
 #### Client
 - Install Python and dependencies.
 - Run the GUI client:
-  - `python client.py`
+  - `python gui.py`
 - The GUI should open in a new window. It will prompt you with a username, host, and port.
 - Enter a username of your choice, put "localhost" for host and then input the port that the terminal displayed after you setup the server
 - You can now post messages using the GUI and also look at users and join users from the top tab. 
 - Open a new instance of the client using the terminal to add multiple users to a group
 
 ## Issues we faced
+- We faced a major issue figuring out how to handle notifications from the server. We could not use a request-response architecture (like an API) on the socket since the client needs to be able to receive notifications from the server at any time. We handled this by introducing a live client listener thread that handles messages as they are received from the server.
 - We faced some issues with the GUI setup and getting all the windows in the right spot and displaying the output of the messages correctly. 
 - After looking into more documentation of tkinter we figured out how to get a good GUI that works with all the functions and also display the messages
 - We had a parsing error in python during our test runs but this was fixed by updating to the latest version of python 
