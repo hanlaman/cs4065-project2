@@ -363,7 +363,7 @@ class DetailFrame(Frame):
     def setSender(self, val: str = ""):
         self._senderVar.set(val)
     def setFromDate(self, val: datetime | None = None):
-        self._dateVar.set(val.strftime("%I:%M:%S %p, %b %d, %Y") if val is not None else "")
+        self._dateVar.set(val.astimezone().strftime("%I:%M:%S %p, %b %d, %Y") if val is not None else "")
     def setSubject(self, val: str = ""):
         self._subjectVar.set(val)
     def setContent(self, val: str = ""):

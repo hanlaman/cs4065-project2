@@ -1,6 +1,6 @@
 import java.io.*;
 import java.net.*;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ThreadFactory;
@@ -224,18 +224,18 @@ class Command implements Runnable {
         if (!board.Messages.containsKey(id)) return;
         var msg = board.Messages.get(id);
 
-        caller.send("VIEW|" + group + "|" + Integer.toUnsignedString(id) + "|" + msg.Sender + "|" + msg.PostDate.format(DateTimeFormatter.ISO_DATE_TIME) + "|" + msg.Subject + "|" + msg.Content);
+        caller.send("VIEW|" + group + "|" + Integer.toUnsignedString(id) + "|" + msg.Sender + "|" + DateTimeFormatter.ISO_INSTANT.format(msg.PostDate) + "|" + msg.Subject + "|" + msg.Content);
     }
 }
 
 // message class represents a single message in a board 
 class Message {
-    public final LocalDateTime PostDate;
+    public final Instant PostDate;
     public final String Sender;
     public final String Subject;
     public final String Content;
 
-    public Message(String sender, LocalDateTime postDate, String subject, String content) {
+    public Message(String sender, Instant postDate, String subject, String content) {
         PostDate = postDate;
         Sender = sender;
         Subject = subject;
@@ -281,7 +281,7 @@ class Board {
     public void Post(Client client, String subject, String content) {
         if (!clients.containsKey(client)) return;
         var id = rnd.nextInt();
-        var message = new Message(clients.get(client), LocalDateTime.now(), subject, content);
+        var message = new Message(clients.get(client), Instant.now(), subject, content);
         Messages.put(id, message);
 
         // notify others of a new message
